@@ -1,12 +1,9 @@
-from fastapi import FastAPI, Path, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from typing import List
-from models.movies import MovieModel, Movie
-from models.users import User
-from jwt_manager import create_token, validate_token
-from config.database import session, engine, Base
+from config.database import engine, Base
 from middlewares.error_handler import ErrorHandler
-from middlewares.jwt_bearer import JWTBearer
+from routers.movie import movie_router
+from routers.users import users_router
 
 # Create the FastAPI instance.
 app = FastAPI()
@@ -17,7 +14,14 @@ app.version = '0.0.2'
 # Add the error handler middleware.
 app.add_middleware(ErrorHandler)
 
+# Create the database tables.
 Base.metadata.create_all(bind=engine)
+
+# Include the user router.
+app.include_router(users_router)
+
+# Include the movie router.
+app.include_router(movie_router)
 
 # Function to get the home page.
 @app.get('/', tags=['home'])
@@ -34,74 +38,3 @@ def home_page():
     </html>
     """)
     return message
-
-# Function to do user login.
-@app.post('/login', tags=['auth'], status_code=200)
-def login(user: User):
-    if user.email == 'admin@email.com' and user.password == 'password':
-        token: str = create_token(user.model_dump())        # Create a token.
-        return {'token': token}
-    raise HTTPException(status_code=401, detail='Invalid email or password')
-
-# Function to get all movies in our database.
-@app.get('/movies', tags=['movies'], response_model=List[Movie], dependencies=[Depends(JWTBearer())])
-def list_movies(): 
-    db = session()                                          # Create a database session.
-    list_movies = db.query(MovieModel).all()                # Get all movies from the database.
-    return list_movies    
-
-# Function to get a movie by ID.
-@app.get('/movies/{movie_id}', tags=['movies'], response_model=Movie, dependencies=[Depends(JWTBearer())])
-def get_by_id(movie_id: int = Path(ge = 0, description='The ID of the movie you want to retrieve.')):
-    db = session()                                          # Create a database session.
-    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()   # Get the movie from the database usising filter from SQLAlchemy and show the first result.
-    if movie:
-        return movie
-    raise HTTPException(status_code=404, detail={'message': 'Movie not found.'})
-
-# Funtion to get movies by category.
-@app.get('/movies/category/{category}', tags=['movies'], response_model=List[Movie], dependencies=[Depends(JWTBearer())])
-def get_by_category(category: str = Path(description='The category of the movie you want to retrieve.')):
-    db = session()                                          # Create a database session.
-    movies = db.query(MovieModel).filter(MovieModel.category == category).all()  # Get the movies from the database usising filter from SQLAlchemy and show all results.
-    if movies:
-        return movies
-    raise HTTPException(status_code=404, detail={'message': 'Any movie was found with this category.'})
-
-
-# Function to create a new movie in our database.
-@app.post('/movies', tags=['movies'], response_model=dict, status_code=201, dependencies=[Depends(JWTBearer())])
-def create_movie(movie: Movie):
-    try:
-        movie = MovieModel(**movie.model_dump())            # Create a movie object.
-        db = session()                                      # Create a database session.
-        db.add(movie)                                       # Add the movie to the database.
-        db.commit()                                         # Save the changes.
-        return {'message': 'Movie created successfully.'}
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail={'message': 'Internal server error.'})
-    
-# Function to update a movie in our database.
-@app.put('/movies/{movie_id}', tags=['movies'], response_model=dict, status_code=200, dependencies=[Depends(JWTBearer())])
-def update_movie(movie_id: int = Path(ge = 0, description='The ID of the movie you want to update.'), movie: Movie = None):
-    db = session()                                          # Create a database session.
-    movie_to_update = db.query(MovieModel).filter(MovieModel.id == movie_id).first()    # Get the movie from the database usising filter from SQLAlchemy and show the first result.
-    if movie_to_update:
-        movie_data = movie.model_dump()                     # Get the movie data.
-        for key, value in movie_data.items():               # Update the movie data.
-            setattr(movie_to_update, key, value)
-        db.commit()                                         # Save the changes.
-        return {'message': 'Movie updated successfully.'}
-    raise HTTPException(status_code=404, detail={'message': 'Movie not found.'})
-
-# Function to delete a movie in our database.
-@app.delete('/movies/{movie_id}', tags=['movies'], response_model=dict, status_code=200, dependencies=[Depends(JWTBearer())])
-def delete_movie(movie_id: int = Path(ge = 0, description='The ID of the movie you want to delete.')):
-    db = session()                                          # Create a database session.
-    movie_to_delete = db.query(MovieModel).filter(MovieModel.id == movie_id).first()    # Get the movie from the database usising filter from SQLAlchemy and show the first result.
-    if movie_to_delete:
-        db.delete(movie_to_delete)                          # Delete the movie.
-        db.commit()                                         # Save the changes.
-        return {'message': 'Movie deleted successfully.'}
-    raise HTTPException(status_code=404, detail={'message': 'Movie not found.'})
