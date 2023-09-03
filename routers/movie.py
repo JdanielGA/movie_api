@@ -3,6 +3,7 @@ from typing import List
 from models.movies import MovieModel, Movie
 from config.database import session
 from middlewares.jwt_bearer import JWTBearer
+from services.movie import MovieService
 
 movie_router = APIRouter()
 
@@ -10,14 +11,14 @@ movie_router = APIRouter()
 @movie_router.get('/movies', tags=['movies'], response_model=List[Movie], dependencies=[Depends(JWTBearer())])
 def list_movies(): 
     db = session()                                          # Create a database session.
-    list_movies = db.query(MovieModel).all()                # Get all movies from the database.
+    list_movies = MovieService(db).get_movies()            # Get all movies from the database using the service.
     return list_movies    
 
 # Function to get a movie by ID.
 @movie_router.get('/movies/{movie_id}', tags=['movies'], response_model=Movie, dependencies=[Depends(JWTBearer())])
 def get_by_id(movie_id: int = Path(ge = 0, description='The ID of the movie you want to retrieve.')):
     db = session()                                          # Create a database session.
-    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()   # Get the movie from the database usising filter from SQLAlchemy and show the first result.
+    movie = MovieService(db).get_movie_by_id(movie_id)   # Get the movie from the database usising filter from SQLAlchemy and show the first result.
     if movie:
         return movie
     raise HTTPException(status_code=404, detail={'message': 'Movie not found.'})
@@ -26,7 +27,7 @@ def get_by_id(movie_id: int = Path(ge = 0, description='The ID of the movie you 
 @movie_router.get('/movies/category/{category}', tags=['movies'], response_model=List[Movie], dependencies=[Depends(JWTBearer())])
 def get_by_category(category: str = Path(description='The category of the movie you want to retrieve.')):
     db = session()                                          # Create a database session.
-    movies = db.query(MovieModel).filter(MovieModel.category == category).all()  # Get the movies from the database usising filter from SQLAlchemy and show all results.
+    movies = MovieService(db).get_movie_by_category(category)  # Get the movies from the database usising filter from SQLAlchemy and show all results.
     if movies:
         return movies
     raise HTTPException(status_code=404, detail={'message': 'Any movie was found with this category.'})
