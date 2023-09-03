@@ -8,4 +8,13 @@ class ErrorHandler(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: requests, call_next) -> Response | JSONR:
-        return await super().dispatch(request, call_next)
+        try:
+            return await call_next(request)
+        except Exception as e:
+            return JSONR(
+                status_code=500,
+                content={
+                    'message': 'Internal Server Error',
+                    'detail': str(e)
+                }
+            )
