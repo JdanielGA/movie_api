@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from models.users import User
-from jwt_manager import create_token
+from schemas.users import User
+from utils.jwt_manager import create_token
 
 
 users_router = APIRouter()
