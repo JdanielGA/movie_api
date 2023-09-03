@@ -1,27 +1,23 @@
-from fastapi import FastAPI, Path, Query, HTTPException, Request, Depends
+from fastapi import FastAPI, Path, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from typing import List, Dict
-from starlette.requests import Request
+from typing import List
 from models.movies import MovieModel, Movie
 from models.users import User
 from jwt_manager import create_token, validate_token
-from fastapi.security import HTTPBearer
 from config.database import session, engine, Base
+from middlewares.error_handler import ErrorHandler
+from middlewares.jwt_bearer import JWTBearer
 
-
+# Create the FastAPI instance.
 app = FastAPI()
 app.title = 'Movie Description with FastAPI'
 app.description = 'This is a simple API that returns movie description'
 app.version = '0.0.2'
 
-Base.metadata.create_all(bind=engine)
+# Add the error handler middleware.
+app.add_middleware(ErrorHandler)
 
-class JWTBearer(HTTPBearer):
-    async def __call__(self, request: Request):
-        auth = await super().__call__(request)
-        data = validate_token(auth.credentials)
-        if data['email'] != 'admin@email.com':
-            raise HTTPException(status_code=403, detail='Invalid credentials')
+Base.metadata.create_all(bind=engine)
 
 # Function to get the home page.
 @app.get('/', tags=['home'])
